@@ -1,6 +1,7 @@
+import re
 import urllib
-from typing import Dict
 import urllib.parse
+from typing import Dict
 
 
 def box_to_id(box):
@@ -274,6 +275,7 @@ class Code:
         return len(self.code_lines)
 
     def resolve_labels(self):
+        self.labels["end"] = self.next_line_no()
         for instr in self.code_lines.values():
             instr.resolve_labels(self.labels)
 
@@ -314,34 +316,58 @@ class Code:
 
     i_pnl = i_nl
 
+    INSTALOGIK_MAP = {
+        "Wczytaj do": "read",
+        "Ustaw": "set",
+        "Zwiększ": "inc",
+        "Zmniejsz": "dec",
+        "Jeżeli": "if",
+        "Skocz do": "goto",
+        "Wypisz pudełko": "pbox",
+        "Wypisz napis": "pstr",
+        "Przejdź do nowej linii": "pnl",
+    }
+
+    all_keys = "|".join(list(INSTALOGIK_MAP.keys()) + list(INSTALOGIK_MAP.values()))
+    LINE_INSTA_REGEX = re.compile(f'^([0-9]*\\.)\\W*({all_keys})(.*)')
+
+    def insta_line(self, line):
+        regex = self.LINE_INSTA_REGEX.match(line)
+        if not regex:
+            return None, line
+
+        print(regex.groups())
+        lineno, cmd, args = regex.groups()
+        inst = self.INSTALOGIK_MAP.get(cmd, cmd)
+        if inst == "if":
+            args = args.replace("inaczej skocz do", "else").replace("skocz do", "goto")
+            args = args.replace("następnej", "+1").replace("końca", "end")
+            args = args.replace("≥", ">=").replace("≠", "!=").replace("≤", "<=")
+        elif inst == "goto":
+            args = args.replace("następnej", "+1").replace("końca", "end")
+        elif inst == "pstr":
+            args = args.strip().strip("'").replace(" ", "%20")
+        elif inst == "set":
+            args = args.replace("na", "")
+
+        return int(lineno.rstrip(".")), f"{inst} {args}"
+
     def add_line(self, line):
-        """
-        1. Wczytaj do A                                 => read A
-        3. Zwiększ B o 1                                => inc B 1
-        4. Jeżeli B = 60 skocz do 5 inaczej skocz do 7  => if B = 60 goto 5 else 7
-        6. Zmniejsz B o 60                              => dec B 60
-        9. Ustaw A na 0                                 => set A 0
-        14. Skocz do 12                                 => goto 12
-        27. Wypisz pudełko A                            => pbox A
-        28. Wypisz napis ':'                            => pstr :
-        30. Wypisz napis '0'                            => pstr 0
-        30. Wypisz napis '0'                            => pstr %20
-
-        #  Należy jeszcze uwzględnić adresy lini: "następnej" => +1; "końca" => end
-
-        :param line:
-        :return:
-        """
         line = line.strip()
         if not line or line.startswith("#"):
             return
+        print(f"LINE={line}")
+        lineno, line = self.insta_line(line)
         elements = line.split()
+
         if len(elements) == 1 and elements[0].endswith(":"):
             if len(elements[0]) > 1:
                 self.label(elements[0][:-1])
         else:
             cmd = elements[0].lower()
-            func = getattr(self, f"i_{cmd}")
+            func = getattr(self, f"i_{cmd}", None)
+            if func is None:
+                raise ValueError(f"line {self.pos} invalid, command '{cmd}' not found in: '{line}'")
             args = [int(elt) if elt.isdigit() else elt for elt in elements[1:]]
             if cmd == "if":
                 assert (
@@ -353,6 +379,7 @@ class Code:
                 args.pop(5)
                 args.pop(3)
             func(*args)
+            assert lineno is None or lineno == self.pos, f"Invalid line number {lineno} (expected {self.pos})"
 
     def next_line_no(self):
         return self.pos + 1
@@ -369,6 +396,7 @@ class Code:
         return "&".join(buf)
 
     def get_code_txt(self, with_line_no=True):
+        self.resolve_labels()
         lines = []
         for idx, instr in sorted(self.code_lines.items()):
             if with_line_no:
