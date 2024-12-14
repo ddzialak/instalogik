@@ -2,13 +2,14 @@ import random
 
 from inst import Code
 
-
-# Read 5 unique numbers from range 1 .. 8 (random order) and print out 3 missing number
-
+# Read 5 unique numbers from range 1 .. 8 (random order)
+# and print out 3 missing number
 
 NUM_READS = 5
 NUM_NUMBERS = 8
 TOTAL_SUM = 2 ** (NUM_NUMBERS + 1) - 2
+
+assert TOTAL_SUM < 1_000_000
 
 # 1 => 2^7
 # 8 => 2^1
@@ -42,26 +43,21 @@ no_print:
 """)
 
 
-print("... code ...")
-
+print(" --- url params ---")
 print(c.get_code())
 
+print("\n --- code ---")
 print(c.get_code_txt(with_line_no=True))
-
-# c.run([1, 2, 3, 4, 5], debug=False)
-# c.run([8,7,6,5,4], debug=True)
 
 
 def check_nums(numbers):
     input = list(numbers)
     random.shuffle(input)
-    output = c.run(list(input), debug=False)
-    result = list(int(o.strip()) for o in output if o.strip().isdigit())
-    #print(f"Input: {input}  result: {result}")
-    assert len(result) == 3
-    assert set(input + result) == set(range(1, 9))
+    expected_output = [x for x in range(1, 9) if x not in input]
+    c.run_test(input, expected_output)
 
 
+print("--- all test cases ---")
 for i in range(1, 7):
     for j in range(i + 1, 8):
         for k in range(j + 1, 9):

@@ -7,41 +7,69 @@ from inst import Code
 code = Code("""
 1. Wczytaj do A
 2. Wczytaj do B
-3. Wczytaj do C
-4. Wczytaj do D
-5. Jeżeli A ≥ B skocz do następnej inaczej skocz do 18
-6. Jeżeli C ≥ D skocz do następnej inaczej skocz do 14
-7. Jeżeli C < A skocz do następnej inaczej skocz do 17
-8. Wypisz pudełko C
-9. Przejdź do nowej linii
-10. Jeżeli B ≥ D skocz do następnej inaczej skocz do 13
-11. Wypisz pudełko D
-12. Skocz do końca
-13. Skocz do końca
-14. Jeżeli A ≥ D skocz do następnej inaczej skocz do końca
-15. Wypisz pudełko D
-16. Skocz do końca
-17. Przejdź do nowej linii
-18. Jeżeli C > D skocz do następnej inaczej skocz do końca
-19. Jeżeli B ≥ C skocz do następnej inaczej skocz do końca
-20. Wypisz pudełko C
-21. Przejdź do nowej linii
-22. Jeżeli A ≥ D skocz do następnej inaczej skocz do 24
-23. Wypisz pudełko D
-24. Skocz do końca
-25. Jeżeli B ≥ D skocz do następnej inaczej skocz do końca
-26. Wypisz pudełko B
-27. Skocz do końca
-28. Jeżeli B ≥ D skocz do następnej inaczej skocz do końca
-29. Wypisz pudełko D
-30. Skocz do końca
-31. Wypisz napis '0'
+3. Jeżeli A < B skocz do następnej inaczej skocz do wczytaj_c_i_d
+
+# sortowanie, pudełko A niech zawiera większą a B mniejszą lub równą
+set C A
+set A B
+set B C
+
+wczytaj_c_i_d:
+    read C
+    read D
+
+if A < C goto ignore_c else next
+if A < D goto ignore_d else next
+
+# C oraz D są mniejsze od A, zatem najpiew
+# należy wypisać większą z nich
+print_bigger:
+    if C > D goto next else print_d
+
+print_c:
+    pbox C
+    # pozostaje tylko sprawdzić, czy należy wypisać D
+    goto wypisz_D_jesli_nie_wieksze_od_B
+
+print_d:
+    pbox D
+    # wypsaliśmy D, zatem należy jeszcze sprawdzić czy C jest większe od B
+    # i jeśli tak, to wypisać B. mamy już podobny fragment, tylko że z pudełkiem
+    # D a nie C, zatem możemy skopiować C do D i wykorzystać ten sam fragment kodu
+    set D C
+    goto wypisz_D_jesli_nie_wieksze_od_B
+
+wypisz_D_jesli_nie_wieksze_od_B:
+    if B >= D goto next else end
+    pnl
+    pbox D
+    goto end
+
+print_zero:
+    pstr 0
+    goto end
+
+ignore_c:
+    # wiemy że trzeba odrzucić C, pozostaje zatem
+    # wypisać pudełko D jeśli mniejsze lub równe A, inaczej zero
+    if A >= D goto next else print_zero
+    pbox D
+    goto end
+
+ignore_d:
+    # wiemy że trzeba odrzucić D, pozostaje zatem
+    # wypisać pudełko C jeśli mniejsze lub równe A, inaczej zero
+    if A >= C goto next else print_zero
+    pbox C
 """)
 
+print("--- code ---")
 print(code.get_code_txt())
+
+print("\n--- url params ---")
 print(code.get_code())
 
-def verify(inp, response):
+def get_expected_result(inp):
     t1, t2, w1, w2 = inp
     if w2 > w1:
         w1, w2 = w2, w1
@@ -58,14 +86,14 @@ def verify(inp, response):
             res.append(w2)
     if not res:
         res.append(0)
+    return res
 
-    assert res == response, f"Expected {res} but received: {response}"
 
-
+print("\n --- tests ---")
 for m in range(1, 8):
     for j in range(1, 8):
         for w1 in range(1, 8):
             for w2 in range(1, 8):
-                result = code.run([m, j, w1, w2], debug=True)
-                result = [int(line.strip()) for line in result]
-                verify([m, j, w1, w2], result)
+                input_vals = [m, j, w1, w2]
+                expected_result = get_expected_result(input_vals)
+                code.run_test(input_vals, expected_result, debug=False)

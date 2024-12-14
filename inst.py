@@ -52,16 +52,17 @@ class Instruction:
         self.code = None
         self.debug_info = None
 
-    @staticmethod
-    def resolve_addr(current_addr, pos, labels):
-        if isinstance(pos, str):
-            pos = labels.get(pos, pos)
-            if isinstance(pos, str) and pos and pos[0] in {"+", "-"}:
-                return current_addr + int(pos)
-            if pos is None:
-                raise ValueError(f"Undefined address {pos}")
-            return pos
-        return int(pos)
+    def resolve_addr(self, addr, labels):
+        addr = labels.get(addr, addr)
+        if isinstance(addr, int):
+            return addr
+        if addr[0] in {"+", "-"}:
+            return self.pos + int(addr)
+        try:
+            return int(addr)
+        except ValueError:
+            pass
+        raise ValueError(f"Undefined address '{addr}' in line {self.pos}: {self.debug_info}")
 
     def resolve_labels(self, labels):
         pass
@@ -122,8 +123,8 @@ class IfInstr(Instruction):
         self.else_goto = else_goto
 
     def resolve_labels(self, labels):
-        self.then_goto = self.resolve_addr(self.pos, self.then_goto, labels)
-        self.else_goto = self.resolve_addr(self.pos, self.else_goto, labels)
+        self.then_goto = self.resolve_addr(self.then_goto, labels)
+        self.else_goto = self.resolve_addr(self.else_goto, labels)
         self.code = code_instr(
             self.pos,
             "if",
@@ -209,7 +210,7 @@ class GotoInstr(Instruction):
         self.addr = addr
 
     def resolve_labels(self, labels):
-        self.addr = self.resolve_addr(self.pos, self.addr, labels)
+        self.addr = self.resolve_addr(self.addr, labels)
         self.code = code_instr(self.pos, "goto", self.addr)
         self.debug_info = f"goto {self.addr}"
 
@@ -264,7 +265,7 @@ class Code:
     IF_GT = ">"
 
     def __init__(self, code_txt=None):
-        self.labels = {"n": "+1", "next": "+1"}
+        self.labels = {"next": "+1", "n": "+1"}
         self.code_lines: Dict[int, Instruction] = {}
         if code_txt:
             for line in code_txt.splitlines():
@@ -275,6 +276,7 @@ class Code:
         return len(self.code_lines)
 
     def resolve_labels(self):
+        self.labels["next"] = '+1'
         self.labels["end"] = self.next_line_no()
         for instr in self.code_lines.values():
             instr.resolve_labels(self.labels)
@@ -336,7 +338,6 @@ class Code:
         if not regex:
             return None, line
 
-        print(regex.groups())
         lineno, cmd, args = regex.groups()
         inst = self.INSTALOGIK_MAP.get(cmd, cmd)
         if inst == "if":
@@ -356,7 +357,7 @@ class Code:
         line = line.strip()
         if not line or line.startswith("#"):
             return
-        print(f"LINE={line}")
+
         lineno, line = self.insta_line(line)
         elements = line.split()
 
@@ -405,8 +406,24 @@ class Code:
                 lines.append(instr.debug_info)
         return "\n".join(lines)
 
-    def run(self, input_lines, debug=False):
-        return Machine(input_lines).exec(self, debug=debug)
+    def run(self, input_lines, debug=False, as_numbers=False):
+        print(f"Inputs: {input_lines}")
+        steps, result = Machine(input_lines).exec(self, debug=debug)
+        if as_numbers:
+            result = [int(val) for val in " ".join(result).split()]
+        print(f"Steps: {steps}, result: {result}")
+        return result
+
+    def run_test(self, input_lines, expected_outputs, debug=False):
+        as_numbers = all(isinstance(val, int) for val in expected_outputs)
+
+        result = self.run(input_lines, debug=debug, as_numbers=as_numbers)
+        if not as_numbers:
+            expected_outputs = [str(e) for e in expected_outputs]
+        if result != expected_outputs:
+            raise AssertionError(f"For input lines: {input_lines} expected result was {expected_outputs}"
+                                 f"but program returned: {result}")
+        return result
 
 
 class Machine:
@@ -442,7 +459,6 @@ class Machine:
 
         code.resolve_labels()
         self.lines_to_read = list(self.input_lines)
-        print(f"Inputs: {self.input_lines}")
         step = 0
         in_out_crc = None
         while self.ptr < code.next_line_no():
@@ -464,7 +480,6 @@ class Machine:
                     print(f"input: {self.lines_to_read}, output: {self.outputs}")
 
         self.outputs[:] = ("".join(self.outputs)).splitlines(keepends=True)
-        print(f"Steps: {step}, result: {self.outputs}")
         assert not self.lines_to_read, f"Leftovers on input: {self.lines_to_read}"
 
-        return self.outputs
+        return step, self.outputs

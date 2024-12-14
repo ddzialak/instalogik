@@ -10,7 +10,7 @@ Aplikacja www do assembly: https://assembly-lang.org/app/
   - `value` - oznacza wartość liczbową bądź pudełko
   - `comparator` - porównanie, czyli jeden z napisów: `=`, `>`, `<`, `<=`, `>=`, `!=`
   - `str` - napis, dowolny string, ale spacje muszą być zamienione przez `%20`
-  - `address` - oznacza adres w kodzie, czyli etykieta, numer linii lub adres względny, np. `+1`, `-3`
+  - `address` - czyli numer linii  (np. `1`, `5`), adres względny, np. `+1`, `-3` lub etykieta
 
 ### Dostępne instrukcje:
 
@@ -30,7 +30,7 @@ Aplikacja www do assembly: https://assembly-lang.org/app/
   - `# komentarz` - puste linie oraz wszystkie rozpoczynające się od kratki są ignorowane
   - `123.  CODE` - liczby na początku linii poprzedzone kropką traktowane są jako numer
      linii, jeśli liczba nie zgadza się z numerem linii to wystąpi błąd
-  - `etykieta:`  - oznaczenie miejsca w kodzie, umożliwia wykonać `goto etykieta`
+  - `etykieta:`  - oznaczenie miejsca w kodzie, pozwala używać `etykieta` jako adresu, np. `goto etykieta`
 
 
 ### Szablon programu:
@@ -51,7 +51,7 @@ pnl
 print("Kod z numerami lini:")
 print(code.get_code_txt())
 
-print("\nUrl do importu na stronie:")
+print("\nUrl-params do importu na stronie:")
 print(code.get_code())
 
 def get_result(param):
@@ -102,9 +102,9 @@ code = Code("""
 9. Wypisz pudełko B
 """)
 
-assert code.run([9, 7], debug=True) == ["7\n", "9"]
+code.run_test([9, 7], expected_outputs=[7, 9], debug=True)
 ```
 
-Na stronie instalogika w konsoli można zaimportować kod:
-
-    set_code_block("<wygenerowany url>")
+Import kodu na stronie instalogika:
+  - jeśli jest jakiś kod, należy usunąć wszystkie bloki
+  - w konsoli js wykonać: `set_code_block("<wygenerowany url>")`
