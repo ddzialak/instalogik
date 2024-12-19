@@ -451,6 +451,13 @@ class Machine:
         ), f"Program output before read all input lines, not read: {self.lines_to_read}"
         self.outputs.append(val)
 
+    def get_debug_state(self, step, instr):
+        buckets_str = " ".join(
+            f"{box}={val:<3}" for box, val in sorted(self.buckets.items())
+        )
+        in_out_crc = len(self.lines_to_read) + len(self.outputs)
+        return f"{buckets_str} [{step:03}] {self.ptr:3} {instr.debug_info}"
+
     def exec(self, code, debug=False):
         self.ptr = 1
         self.counts = {}
@@ -462,17 +469,17 @@ class Machine:
         step = 0
         in_out_crc = None
         while self.ptr < code.next_line_no():
-            if step > 10_000:
-                raise AssertionError("Too much steps.")
-            step += 1
             instr: Instruction = code.code_lines[self.ptr]
+            if step > 10_000:
+                raise AssertionError(f"Too much steps: {self.get_debug_state(step, instr)}")
+            step += 1
             self.counts[self.ptr] = self.counts.get(self.ptr, 0) + 1
             if debug:
                 buckets_str = " ".join(
                     f"{box}={val:<3}" for box, val in sorted(self.buckets.items())
                 )
                 in_out_crc = len(self.lines_to_read) + len(self.outputs)
-                print(f"{buckets_str} [{step:03}] {self.ptr:3} {instr.debug_info}")
+                print(self.get_debug_state(step, instr))
             instr.exec(self)
             instr.next(self)
             if debug:
